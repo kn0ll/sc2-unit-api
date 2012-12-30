@@ -6,6 +6,7 @@ a simple http api for accessing information about Starcraft 2 units. this inform
 
 ```
 $ npm install -g sc2-unit-api
+```
 
 ## setting up the database
 
