@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+var colors = require('colors'),
+  cradle = require('cradle'),
+  prompt = require('prompt'),
+  scrape = require('../lib/scrape'),
+  resources = require('../lib/resources'),
+  Unit = resources.Unit;
+
+prompt.message = '';
+prompt.delimiter = '';
+
+var base_url = 'http://us.battle.net/sc2/en/game/';
+  
+function parse_unit($) {
+  var unit = Unit.new({
+    name: $.trim($('#content-title h2').text()),
+    race: $.trim($('td:contains("Race:")').next().text()),
+    life: parseInt($.trim($('td:contains("Life:")').next().text())),
+    movement: $.trim($('td:contains("Movement:")').next().find('.has-tooltip').text()),
+    cargo_size: parseInt($.trim($('td:contains("Cargo Size:")').next().text())),
+    attributes: $.trim($('td:contains("Attributes:")').next().text()).match(/[a-zA-Z]+/g),
+    armor: {
+      base: $.trim($('td:contains("Armor:")').next().text()).match(/[0-9]/g)[0],
+      max: $.trim($('td:contains("Armor:")').next().text()).match(/[0-9]/g)[1]
+    }
+  });
+
+  unit.save(function() {
+    console.log([unit.name, 'saved'].join(' ').green);
+  });
+};
+
+function parse_units($) {
+  console.log('Finished scraping'.green, '\n');
+  console.log('Parsing unit types'.magenta);
+  var urls = {};
+  $('.race-unit .section ul li a').each(function(i, a) {
+    var $a = $(a);
+    urls[$a.text()] = $a.attr('href');
+  });
+  var keys = Object.keys(urls);
+  console.log(['Found', keys.length, 'unit types:', keys.join(', ')].join(' ').green, '\n');
+  for (var name in urls) {
+    var url = [base_url, urls[name]].join('');
+    console.log(['Scraping ', url, ' for ', name, '...'].join('').magenta)
+    scrape(url, parse_unit);
+  }
+};
+
+function seed() {
+  console.log(['Scraping ', base_url, '...'].join('').magenta);
+  scrape(base_url, parse_units);
+};
+
+prompt.start();
+
+prompt.get({
+  properties: {
+    host: {
+      pattern: /[0-9\.]+/,
+      default: 'http://127.0.0.1',
+      description: 'CouchDB hostname',
+      required: true
+    },
+    port: {
+      pattern: /[0-9]+/,
+      default: '5984',
+      description: 'CouchDB port',
+      required: true
+    },
+    database: {
+      pattern: /[a-zA-Z0-9]+/,
+      default: 'units',
+      description: 'CouchDB database',
+      required: true
+    }
+  }
+}, function (err, result) {
+  var database = result.database;
+  var couch = new(cradle.Connection)(result.host, parseInt(result.port), {
+      cache: false,
+      raw: false
+  });
+
+  var db = couch.database(database);
+
+  db.exists(function (err, exists) {
+    if (exists) {
+      var msg = ['The "', database, '" database already exists. Would you like to recreate it?'].join('').cyan;
+      prompt.get({
+        properties: {
+          recreate: {
+            pattern: /Y|N|y|n/,
+            default: 'Y',
+            description: msg,
+            message: '(Y/N)',
+            required: true
+          }
+        }
+      }, function(err, result) {
+        if (result.recreate == 'Y' || result.recreate == 'y') {
+          console.log('Destroying database...'.magenta);
+          db.destroy(function() {
+            console.log('Database destroyed'.green, '\n');
+            console.log('Recreating database...'.magenta);
+            db.create();
+            console.log('Database created'.green, '\n');
+            seed();
+          });
+        } else {
+          seed();
+        }
+      });
+
+    // database does not exist yet, create it
+    } else {
+      console.log(['Database does not exist. Creating now...'].join('').magenta);
+      db.create();
+      console.log('Database created'.green);
+      seed();
+    }
+  });
+});

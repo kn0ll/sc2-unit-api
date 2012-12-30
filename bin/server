@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+var colors = require('colors'),
+  flatiron = require('flatiron'),
+  restful = require('restful'),
+  resources = require('../lib/resources');
+
+var app = flatiron.app;
+app.resources = resources;
+
+app.use(flatiron.plugins.http);
+app.use(restful);
+
+app.start(8000, function() {
+  console.log('Started HTTP server on port 8000...'.magenta);
+});
