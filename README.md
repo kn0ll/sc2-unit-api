@@ -32,5 +32,7 @@ Started HTTP server on port 8000...
 
 ## todo
 
-- add nconf support for http server port, as well as couchdb information
-- add documentation on using the api programatically as a library
+- add nconf support for http/couchdb
+- add library documentation
+- add non-attribute metadata (images, etc)
+- scrape remaining attributes attributes
